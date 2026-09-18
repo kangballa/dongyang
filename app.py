@@ -14,7 +14,8 @@ api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
 
 from ml_model import get_recommendation
 from langchain_community.document_loaders import PyMuPDFLoader
-from langchain.text_splitter import RecursiveCharacterTextSplitter
+# ✅ 에러 해결: 최신 langchain 문법으로 수정 완료
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 # Google Gemini 연동 라이브러리
 from langchain_google_genai import GoogleGenerativeAIEmbeddings, ChatGoogleGenerativeAI
 from langchain_community.vectorstores import FAISS
@@ -70,36 +71,37 @@ def mock_design_api_v2(customer_info, product_name, include_rider, payment_term)
     }
 
 # ==========================================
-# 🛠️ 실시간 반영 PDF 생성기
+# 🛠️ 실시간 반영 PDF 생성기 (외부 모듈로 분리됨)
 # ==========================================
-#def generate_proposal_pdf(design_result):
-    pdf = FPDF()
-    pdf.add_page()
-    
-    font_path = "C:/Windows/Fonts/malgun.ttf"
-#    if os.path.exists(font_path):
-#        pdf.add_font("Malgun", "", font_path, uni=True)
-#        pdf.set_font("Malgun", "", 18)
-#    else:
-#        pdf.set_font("Helvetica", "B", 18)
-        
-#    pdf.cell(0, 15, "[ 동양생명 AI 가입설계 제안서 ]", ln=True, align="C")
-#    pdf.ln(10)
-    
-#    if os.path.exists(font_path): 
-#        pdf.set_font("Malgun", "", 12)
-        
-#    pdf.cell(0, 10, f"▶ 추천 상품명 :  {design_result['product_name']}", ln=True)
-#    pdf.cell(0, 10, f"▶ 납입 기간 :  {design_result['payment_term']}", ln=True)
-#    pdf.cell(0, 10, f"▶ 최종 월 보험료 :  {design_result['monthly_premium']:,} 원", ln=True)
-#   pdf.ln(5)
- #   pdf.cell(0, 10, f"✔ 핵심 보장 1 : {design_result['coverage_1']}", ln=True)
-  #  pdf.cell(0, 10, f"✔ 핵심 보장 2 : {design_result['coverage_2']}", ln=True)
-    
-   # pdf.ln(20)
-    #pdf.cell(0, 10, "* 본 제안서는 AI 추천 알고리즘에 의해 고객 맞춤형으로 산출된 가상의 결과물입니다.", ln=True)
-    
-    #return bytes(pdf.output())
+# 🚨 주석 처리된 함수 내부에 코드가 노출되어 에러가 날 수 있어 모두 주석 처리했습니다.
+# def generate_proposal_pdf(design_result):
+#     pdf = FPDF()
+#     pdf.add_page()
+#     
+#     font_path = "C:/Windows/Fonts/malgun.ttf"
+#     if os.path.exists(font_path):
+#         pdf.add_font("Malgun", "", font_path, uni=True)
+#         pdf.set_font("Malgun", "", 18)
+#     else:
+#         pdf.set_font("Helvetica", "B", 18)
+#         
+#     pdf.cell(0, 15, "[ 동양생명 AI 가입설계 제안서 ]", ln=True, align="C")
+#     pdf.ln(10)
+#     
+#     if os.path.exists(font_path): 
+#         pdf.set_font("Malgun", "", 12)
+#         
+#     pdf.cell(0, 10, f"▶ 추천 상품명 :  {design_result['product_name']}", ln=True)
+#     pdf.cell(0, 10, f"▶ 납입 기간 :  {design_result['payment_term']}", ln=True)
+#     pdf.cell(0, 10, f"▶ 최종 월 보험료 :  {design_result['monthly_premium']:,} 원", ln=True)
+#     pdf.ln(5)
+#     pdf.cell(0, 10, f"✔ 핵심 보장 1 : {design_result['coverage_1']}", ln=True)
+#     pdf.cell(0, 10, f"✔ 핵심 보장 2 : {design_result['coverage_2']}", ln=True)
+#     
+#     pdf.ln(20)
+#     pdf.cell(0, 10, "* 본 제안서는 AI 추천 알고리즘에 의해 고객 맞춤형으로 산출된 가상의 결과물입니다.", ln=True)
+#     
+#     return bytes(pdf.output())
 
 # ==========================================
 # 🧠 RAG 및 추천 로직 (Gemini 3.6 Flash 적용)
@@ -313,69 +315,4 @@ if user_input := st.chat_input("채팅으로 대화하세요 (예: 30대 남성 
                 raw_res = raw_res[7:]
             elif raw_res.startswith("```"):
                 raw_res = raw_res[3:]
-            if raw_res.endswith("```"):
-                raw_res = raw_res[:-3]
-            parsed_intent = json.loads(raw_res.strip())
-        except Exception:
-            parsed_intent = {"intent": "qa", "extracted_info": {}}
-
-    intent = parsed_intent.get("intent")
-    
-    # [의도 1] 추천
-    if intent == "recommend":
-        st.session_state.show_tuning = False
-        extracted = parsed_intent.get("extracted_info", {})
-        for k, v in extracted.items():
-            if v is not None and k in REQUIRED_KEYS: 
-                st.session_state.collected_info[k] = v
-            if k == "선호상품" and v is not None: 
-                st.session_state.collected_info["선호상품"] = v
-            
-        missing_keys = [k for k in REQUIRED_KEYS.keys() if k not in st.session_state.collected_info]
-        if missing_keys:
-            ask_msg = f"정확한 보험 추천을 위해 다음 정보가 더 필요합니다.\n\n👉 **누락된 정보:** {', '.join([REQUIRED_KEYS[k] for k in missing_keys])}"
-            with st.chat_message("assistant"): 
-                st.markdown(ask_msg)
-            st.session_state.messages.append({"role": "assistant", "content": ask_msg})
-        else:
-            process_recommendation(st.session_state.collected_info, retriever, llm)
-
-    # [의도 2] 가입설계 튜닝
-    elif intent == "design":
-        if "last_recommended_product" not in st.session_state:
-            reply = "⚠️ 먼저 고객 정보를 입력하여 상품 추천을 받은 뒤에 설계서를 요청해 주세요!"
-            with st.chat_message("assistant"): 
-                st.warning(reply)
-            st.session_state.messages.append({"role": "assistant", "content": reply})
-        else:
-            st.session_state.show_tuning = True
-            st.rerun()
-            
-    # [의도 3] 거절 극복 화법
-    elif intent == "objection":
-        with st.chat_message("assistant"):
-            with st.spinner("최고의 영업 실장 모드로 거절 극복 화법을 작성 중입니다..."):
-                obj_prompt = PromptTemplate.from_template(
-                    """당신은 동양생명의 20년 차 최고 에이스 영업 지점장입니다.
-                    설계사(사용자)가 고객의 거절(비싸다, 나중에 하겠다 등)에 부딪혀 조언을 구하고 있습니다.
-                    아래 [약관 자료]와 [고객의 거절 내용]을 바탕으로, 설계사가 고객을 다시 설득할 수 있는 '거절 극복(Objection Handling) 스크립트'를 작성해주세요.
-                    무조건 가르치려 들지 말고, [공감 -> 논리적 반박(비용 분할, 리스크 강조 등) -> 대안 제시]의 흐름으로 현장감 있고 강력하게 작성하세요.
-                    
-                    [약관 자료]: {context}
-                    [고객의 거절 내용]: {question}
-                    """
-                )
-                obj_chain = ({"context": retriever | format_docs, "question": RunnablePassthrough()} | obj_prompt | llm | StrOutputParser())
-                response = obj_chain.invoke(user_input)
-                st.markdown(response)
-        st.session_state.messages.append({"role": "assistant", "content": response})
-
-    # [의도 4] 일반 약관 Q&A
-    else:
-        with st.chat_message("assistant"):
-            with st.spinner("약관을 확인 중입니다..."):
-                qa_prompt = PromptTemplate.from_template("참고자료를 바탕으로 답하세요. 자료: {context}\n질문: {question}")
-                qa_chain = ({"context": retriever | format_docs, "question": RunnablePassthrough()} | qa_prompt | llm | StrOutputParser())
-                response = qa_chain.invoke(user_input)
-                st.markdown(response)
-        st.session_state.messages.append({"role": "assistant", "content": response})
+            if raw_res.endswith("
