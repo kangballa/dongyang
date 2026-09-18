@@ -311,8 +311,10 @@ if user_input := st.chat_input("채팅으로 대화하세요 (예: 30대 남성 
         try:
             raw_res = router_llm.invoke(router_prompt).content.strip()
             # 마크다운 블록(```json) 감싸짐 안전 제거
-            if raw_res.startswith("```json"):
+           # 마크다운 블록(```json) 감싸짐 안전 제거
+            if raw_res.startswith('```json'):
                 raw_res = raw_res[7:]
-            elif raw_res.startswith("```"):
+            elif raw_res.startswith('```'):
                 raw_res = raw_res[3:]
-            if raw_res.endswith("
+            if raw_res.endswith('```'):
+                raw_res = raw_res[:-3]
